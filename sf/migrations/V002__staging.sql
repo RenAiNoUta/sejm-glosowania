@@ -36,16 +36,18 @@ SELECT
   *,
   CASE
     WHEN KIND IS DISTINCT FROM 'ELECTRONIC'                          THEN 'inne'
-    WHEN TITLE ILIKE '%uchwał% senatu%' OR TOPIC ILIKE '%senat%'     THEN 'senat'
+    WHEN TITLE ILIKE '%uchwa% senatu%' OR TOPIC ILIKE '%senat%'      THEN 'senat'
     WHEN TOPIC ILIKE '%ponown% uchwal%'
-      OR TITLE ILIKE '%ponowne rozpatrzenie%'                         THEN 'weto'
+      OR TOPIC ILIKE '%ponowne rozpatrzenie%'                         THEN 'weto'
     WHEN TOPIC ILIKE '%nad całością%'                                 THEN 'calosc'
     WHEN TOPIC ILIKE '%odrzucenie projektu%'
+      OR TOPIC ILIKE '%odrzucenie w całości%'
       OR TOPIC ILIKE '%odrzucenie w pierwszym czytaniu%'              THEN 'odrzucenie'
     WHEN TOPIC ILIKE '%poprawk%' OR TOPIC ILIKE '%wniosek mniejszości%' THEN 'poprawka'
     ELSE 'proceduralne'
   END AS CATEGORY,
-  IFF(TOPIC ILIKE '%odrzucenie projektu%' OR TOPIC ILIKE '%odrzucenie w pierwszym czytaniu%', -1, 1) AS POLARITY,
+  IFF(TOPIC ILIKE '%odrzucenie projektu%' OR TOPIC ILIKE '%odrzucenie w całości%'
+      OR TOPIC ILIKE '%odrzucenie w pierwszym czytaniu%', -1, 1) AS POLARITY,
   REGEXP_SUBSTR(LOWER(TITLE), 'druk\\S*\\s+nr\\s+(\\d+)', 1, 1, 'e', 1) AS PRINT_NO,
   REGEXP_REPLACE(
     COALESCE(

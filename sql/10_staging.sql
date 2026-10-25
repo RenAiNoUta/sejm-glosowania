@@ -41,12 +41,16 @@ SELECT
     -- Rodzaj głosowania. Kolejność warunków ma znaczenie.
     CASE
         WHEN kind IS DISTINCT FROM 'ELECTRONIC'                     THEN 'inne'
-        WHEN title_lc LIKE '%uchwał% senatu%'
+        -- "o uchwale Senatu", "uchwała Senatu" – głosowania nad poprawkami Senatu
+        WHEN title_lc LIKE '%uchwa% senatu%'
           OR topic_lc LIKE '%senat%'                                 THEN 'senat'
+        -- weto: "ponowne uchwalenie ustawy", "ponownym uchwaleniem",
+        -- "przyjęcie wniosku o ponowne rozpatrzenie" – we wszystkich ZA = za ustawą
         WHEN topic_lc LIKE '%ponown% uchwal%'
-          OR title_lc LIKE '%ponowne rozpatrzenie%'                  THEN 'weto'
+          OR topic_lc LIKE '%ponowne rozpatrzenie%'                  THEN 'weto'
         WHEN topic_lc LIKE '%nad całością%'                          THEN 'calosc'
         WHEN topic_lc LIKE '%odrzucenie projektu%'
+          OR topic_lc LIKE '%odrzucenie w całości%'
           OR topic_lc LIKE '%odrzucenie w pierwszym czytaniu%'       THEN 'odrzucenie'
         WHEN topic_lc LIKE '%poprawk%'
           OR topic_lc LIKE '%wniosek mniejszości%'                   THEN 'poprawka'
@@ -57,6 +61,7 @@ SELECT
     -- -1 = głos ZA oznacza sprzeciw (wniosek o odrzucenie projektu).
     CASE
         WHEN topic_lc LIKE '%odrzucenie projektu%'
+          OR topic_lc LIKE '%odrzucenie w całości%'
           OR topic_lc LIKE '%odrzucenie w pierwszym czytaniu%' THEN -1
         ELSE 1
     END AS polarity,
@@ -74,15 +79,30 @@ SELECT
         WHEN 'prezydenck'  THEN 'prezydencki'
     END AS author_type,
 
-    -- Czytelny tytuł: od słów "projekt… ustawy/uchwały", bez "(druki nr …)".
-    regexp_replace(
-        coalesce(
-            nullif(regexp_extract(title, '([Pp]rojek[^\s]*\s+(ustawy|uchwały).*)', 1), ''),
-            regexp_replace(title, '^Pkt\.?\s*\d+\.?\s*', '')
-        ),
-        '\s*\(druk[^)]*\)\s*$', ''
-    ) AS bill_title
-FROM classified;
+    -- Czytelny tytuł, np. "Projekt ustawy o …" albo "Weto Prezydenta do ustawy …":
+    -- bez numeru punktu, prefiksu "Sprawozdanie Komisji … o", "(druki nr …)"
+    -- i dopisków typu "- trzecie czytanie"; odmiana "projekcie/projektu" → "Projekt".
+    upper(left(t5, 1)) || substr(t5, 2) AS bill_title
+FROM (
+    SELECT
+        *,
+        regexp_replace(
+            regexp_replace(
+                regexp_replace(
+                    regexp_replace(
+                        coalesce(
+                            nullif(regexp_extract(title, '([Pp]rojek(t|tu|cie)\s+(ustawy|uchwały).*)', 1), ''),
+                            regexp_replace(
+                                regexp_replace(title, '^Pkt\.?\s*\d+\.?\s*', ''),
+                                '^Sprawozdanie Komisji[^(]*?\s+o\s+', '')
+                        ),
+                        '\s*\(druk[^)]*\).*$', ''),
+                    '\s+-\s+(pierwsze|drugie|trzecie) czytanie.*$', ''),
+                '^[Pp]rojek(t|tu|cie)\s', 'Projekt '),
+            '^wniosku Prezydenta Rzeczypospolitej Polskiej o ponowne rozpatrzenie ustawy',
+            'Weto Prezydenta do ustawy') AS t5
+    FROM classified
+) AS c;
 
 
 -- ---------------------------------------------------------------------
