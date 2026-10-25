@@ -22,6 +22,9 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+env:
+  PYTHONUNBUFFERED: "1"   # logi Pythona na bieżąco, bez buforowania
+
 jobs:
   build:
     runs-on: ubuntu-latest

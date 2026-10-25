@@ -27,6 +27,7 @@ from ingest.sejm_api import SejmApi
 
 RAW_DIR = Path("data/raw")
 VOTE_KEYS_TO_KEEP = ("MP", "club", "vote", "listVotes")
+PROGRESS_EVERY = 50  # co ile pobranych głosowań wypisać postęp
 
 
 def write_json(path: Path, data) -> None:
@@ -73,8 +74,9 @@ def run(term: int, full: bool = False, api: SejmApi | None = None) -> dict:
     write_json(RAW_DIR / "proceedings.json", proceedings)
 
     sittings = sitting_numbers(proceedings)
+    print(f"Posiedzeń do sprawdzenia: {len(sittings)}")
 
-    for sitting in sittings:
+    for pos, sitting in enumerate(sittings, start=1):
         stats["sittings_checked"] += 1
         path = RAW_DIR / "votings" / f"{sitting:03d}.json"
         listing = api.votings_of_sitting(sitting)
@@ -94,10 +96,16 @@ def run(term: int, full: bool = False, api: SejmApi | None = None) -> dict:
                 continue
             result.append(slim_voting(api.voting(sitting, num)))
             stats["votings_fetched"] += 1
+            if stats["votings_fetched"] % PROGRESS_EVERY == 0:
+                print(
+                    f"  … pobrano {stats['votings_fetched']} głosowań "
+                    f"(posiedzenie {sitting}, {pos}/{len(sittings)})"
+                )
 
         write_json(path, result)
         stats["sittings_fetched"] += 1
-        print(f"  posiedzenie {sitting}: {len(result)} głosowań")
+        print(f"  posiedzenie {sitting} ({pos}/{len(sittings)}): {len(result)} głosowań, "
+              f"łącznie pobrano {stats['votings_fetched']}")
 
     print(
         f"Gotowe. Sprawdzono {stats['sittings_checked']} posiedzeń, "
