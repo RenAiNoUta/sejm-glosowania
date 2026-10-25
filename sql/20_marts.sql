@@ -83,12 +83,17 @@ GROUP BY f.mp_id;
 -- ---------------------------------------------------------------------
 -- Ustawy: głosowania merytoryczne zgrupowane po numerze druku
 -- ---------------------------------------------------------------------
+-- Immunitety i wota zaufania/nieufności to pojedyncze decyzje – każda
+-- z nich jest osobną pozycją (klucz = id głosowania), a nie ustawą.
 CREATE OR REPLACE TABLE int_bill_votings AS
 SELECT
     *,
-    coalesce('druk-' || print_no, 'tytul-' || md5(bill_title)) AS bill_id
+    CASE
+        WHEN category IN ('immunitet', 'wotum') THEN 'glos-' || voting_id
+        ELSE coalesce('druk-' || print_no, 'tytul-' || md5(bill_title))
+    END AS bill_id
 FROM stg_votings
-WHERE category IN ('calosc', 'odrzucenie', 'weto');
+WHERE category IN ('calosc', 'odrzucenie', 'weto', 'immunitet', 'wotum');
 
 CREATE OR REPLACE TABLE dim_bills AS
 WITH ranked AS (
@@ -103,7 +108,7 @@ SELECT
     bill_id,
     print_no,
     bill_title       AS title,
-    author_type,
+    CASE WHEN category IN ('immunitet', 'wotum') THEN NULL ELSE author_type END AS author_type,
     category         AS final_category,
     voting_id        AS final_voting_id,
     voted_at         AS final_vote_at,
@@ -115,6 +120,14 @@ SELECT
         WHEN 'odrzucenie' THEN CASE WHEN yes_votes > no_votes THEN 'projekt odrzucony' ELSE 'w toku' END
         -- odrzucenie weta wymaga 3/5 oddanych głosów
         WHEN 'weto'       THEN CASE WHEN yes_votes * 5 >= total_voted * 3 THEN 'weto odrzucone' ELSE 'weto utrzymane' END
+        -- zgoda na pociągnięcie posła i wotum nieufności: bezwzględna większość
+        -- ustawowej liczby posłów (231); wotum zaufania: zwykła większość
+        WHEN 'immunitet'  THEN CASE WHEN yes_votes >= 231 THEN 'zgoda wyrażona' ELSE 'brak zgody' END
+        WHEN 'wotum'      THEN CASE
+            WHEN lower(topic) LIKE '%nieufności%'
+                THEN CASE WHEN yes_votes >= 231 THEN 'wotum nieufności przyjęte' ELSE 'wotum nieufności odrzucone' END
+            ELSE CASE WHEN yes_votes > no_votes THEN 'wotum zaufania udzielone' ELSE 'wotum zaufania nieudzielone' END
+        END
     END AS outcome,
     abs(yes_votes - no_votes) AS margin
 FROM ranked

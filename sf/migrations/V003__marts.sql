@@ -9,9 +9,10 @@ CREATE OR REPLACE DYNAMIC TABLE SEJM.MARTS.INT_BILL_VOTINGS
 AS
 SELECT
   *,
-  COALESCE('druk-' || PRINT_NO, 'tytul-' || MD5(BILL_TITLE)) AS BILL_ID
+  IFF(CATEGORY IN ('immunitet', 'wotum'), 'glos-' || VOTING_ID,
+      COALESCE('druk-' || PRINT_NO, 'tytul-' || MD5(BILL_TITLE))) AS BILL_ID
 FROM SEJM.STAGING.STG_VOTINGS
-WHERE CATEGORY IN ('calosc', 'odrzucenie', 'weto');
+WHERE CATEGORY IN ('calosc', 'odrzucenie', 'weto', 'immunitet', 'wotum');
 
 CREATE OR REPLACE DYNAMIC TABLE SEJM.MARTS.FCT_BILL_STANCE
   TARGET_LAG = '1 day'

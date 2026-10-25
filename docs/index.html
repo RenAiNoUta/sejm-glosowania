@@ -95,6 +95,7 @@ label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 13.5
 .pill:hover { border-color: var(--ink-3); }
 .pill.on.yes { background: var(--yes-soft); border-color: var(--yes); color: var(--yes); }
 .pill.on.no  { background: var(--no-soft);  border-color: var(--no);  color: var(--no); }
+.tag.kind { background: var(--accent-soft); color: var(--accent); }
 .tag { display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 4px; background: var(--surface-2); color: var(--ink-2); }
 .more { margin-top: 10px; }
 .btn {
@@ -143,7 +144,7 @@ svg text { fill: var(--ink-3); font-size: 11px; }
 <header class="top">
   <div class="wrap">
     <h1>Jak głosował Sejm</h1>
-    <p>Zaznacz, które ustawy chcesz, a których nie. Zobaczysz, kto w Sejmie X kadencji faktycznie głosował najbardziej zgodnie z Twoimi wyborami.</p>
+    <p>Zaznacz, które ustawy i decyzje Sejmu popierasz, a których nie. Zobaczysz, kto w Sejmie X kadencji faktycznie głosował najbardziej zgodnie z Twoimi wyborami.</p>
     <div class="meta" id="meta">Ładowanie danych…</div>
     <nav class="tabs" role="tablist">
       <button role="tab" aria-selected="true" data-tab="match">Dopasowanie</button>
@@ -159,12 +160,18 @@ svg text { fill: var(--ink-3); font-size: 11px; }
     <div class="grid">
       <div class="card">
         <div class="hd">
-          <h2>Ustawy i uchwały</h2>
-          <p>Wszystkie projekty, nad którymi Sejm głosował merytorycznie. Odpowiadasz na pytanie: czy chcesz, żeby to przeszło?</p>
+          <h2>Ustawy, uchwały i inne decyzje</h2>
+          <p>Wszystkie projekty, nad którymi Sejm głosował merytorycznie, oraz głosowania nad immunitetami i wotum zaufania lub nieufności. Odpowiadasz na pytanie: czy chcesz, żeby to przeszło?</p>
         </div>
         <div class="bd">
           <div class="controls">
             <input type="search" id="q" placeholder="Szukaj w tytułach, np. podatek, szkoła, energia…" aria-label="Szukaj ustawy">
+            <select id="f-kind" aria-label="Rodzaj">
+              <option value="">Wszystkie rodzaje</option>
+              <option value="bills">Ustawy i uchwały</option>
+              <option value="immunitet">Immunitety</option>
+              <option value="wotum">Wotum zaufania i nieufności</option>
+            </select>
             <select id="f-outcome" aria-label="Wynik">
               <option value="">Każdy wynik</option>
               <option value="przyjęto">Przyjęte</option>
@@ -190,7 +197,7 @@ svg text { fill: var(--ink-3); font-size: 11px; }
         <div class="card">
           <div class="hd">
             <h2>Kto głosował jak Ty</h2>
-            <p id="answered-info">Zaznacz co najmniej jedną ustawę.</p>
+            <p id="answered-info">Zaznacz co najmniej jedną pozycję.</p>
           </div>
           <div class="bd">
             <div class="controls">
@@ -259,6 +266,12 @@ svg text { fill: var(--ink-3); font-size: 11px; }
         <li><b>nad wnioskiem o odrzucenie projektu</b> – głos ZA oznacza sprzeciw wobec ustawy (kierunek odwracamy),</li>
         <li><b>nad ponownym uchwaleniem ustawy po wecie</b> – głos ZA oznacza poparcie ustawy. Ustawa po wecie ma osobny numer druku, więc występuje na liście jako osobna pozycja.</li>
       </ul>
+      <p>Osobno, jako pojedyncze pozycje, są głosowania, które nie dotyczą ustaw:</p>
+      <ul>
+        <li><b>immunitety</b> – głosowania nad wnioskiem o zgodę na pociągnięcie do odpowiedzialności (np. posła). „Chcę, żeby przeszło” oznacza zgodę. Gdy wniosek dotyczy kilku czynów, każdy jest osobną pozycją, tak jak w Sejmie. Pomijamy głosowania „nad przyjęciem wniosku z druku” komisji, bo z danych nie wynika, czy głos ZA oznacza zgodę, czy odmowę.</li>
+        <li><b>wotum zaufania i nieufności</b> – „Chcę, żeby przeszło” oznacza udzielenie wotum zaufania rządowi albo wyrażenie wotum nieufności wobec ministra.</li>
+      </ul>
+      <p>Wynik pokazujemy według progów z Konstytucji: zgoda na pociągnięcie posła do odpowiedzialności i wotum nieufności wymagają co najmniej 231 głosów, odrzucenie weta – 3/5 głosujących.</p>
       <p>Głosowania są grupowane po numerze druku sejmowego. Jeśli nad jedną ustawą było kilka głosowań merytorycznych, bierzemy <b>ostatni głos, który poseł faktycznie oddał</b>. Klasyfikacja opiera się na tytułach głosowań, więc może się zdarzyć pomyłka – w repozytorium jest raport, który pomaga to sprawdzać.</p>
 
       <h2>Jak liczona jest zgodność</h2>
@@ -284,6 +297,7 @@ svg text { fill: var(--ink-3); font-size: 11px; }
 
   var STORAGE_KEY = "sejm-glosowania:answers:v1";
   var PAGE = 40;
+  var KIND_LABEL = { immunitet: "immunitet", wotum: "wotum", weto: "weto" };
   var PALETTE = ["#4e79a7", "#f28e2b", "#59a14f", "#b07aa1", "#76b7b2", "#edc948", "#9c755f", "#e15759", "#bab0ac", "#ff9da7"];
 
   var D = {};             // dane
@@ -361,7 +375,7 @@ svg text { fill: var(--ink-3); font-size: 11px; }
       $("o-club").insertAdjacentHTML("beforeend", '<option value="' + esc(c.id) + '">' + esc(c.id) + "</option>");
     });
 
-    ["q", "f-outcome", "f-author", "f-sort", "f-answered"].forEach(function (id) {
+    ["q", "f-kind", "f-outcome", "f-author", "f-sort", "f-answered"].forEach(function (id) {
       $(id).addEventListener(id === "q" ? "input" : "change", function () { shown = PAGE; renderBills(); });
     });
     ["o-absent", "o-district", "o-club", "o-active"].forEach(function (id) {
@@ -388,8 +402,10 @@ svg text { fill: var(--ink-3); font-size: 11px; }
   function filteredBills() {
     var q = norm($("q").value).trim().split(/\s+/).filter(Boolean);
     var outcome = $("f-outcome").value, author = $("f-author").value, onlyAns = $("f-answered").checked;
+    var kind = $("f-kind").value;
     var list = D.bills.filter(function (b) {
       if (onlyAns && !answers[b.id]) return false;
+      if (kind === "bills" ? (b.cat === "immunitet" || b.cat === "wotum") : kind && b.cat !== kind) return false;
       if (outcome === "weto" ? b.cat !== "weto" : outcome && b.outcome !== outcome) return false;
       if (author && b.author !== author) return false;
       for (var i = 0; i < q.length; i++) if (b._q.indexOf(q[i]) < 0) return false;
@@ -406,7 +422,8 @@ svg text { fill: var(--ink-3); font-size: 11px; }
     var link = b.print ? '<a href="https://www.sejm.gov.pl/Sejm10.nsf/druk.xsp?nr=' + encodeURIComponent(b.print) + '" target="_blank" rel="noopener">druk nr ' + esc(b.print) + "</a>" : "";
     return '<div class="bill">' +
       '<div class="t">' + esc(b.title) + "</div>" +
-      '<div class="sub"><span>' + fmtDate(b.date) + "</span>" +
+      '<div class="sub">' + (KIND_LABEL[b.cat] ? '<span class="tag kind">' + KIND_LABEL[b.cat] + "</span>" : "") +
+        "<span>" + fmtDate(b.date) + "</span>" +
         (b.outcome ? '<span class="tag">' + esc(b.outcome) + "</span>" : "") +
         "<span>za " + b.yes + " · przeciw " + b.no + " · wstrz. " + b.abst + "</span>" +
         (b.author ? "<span>projekt " + esc(b.author) + "</span>" : "") +
@@ -430,7 +447,7 @@ svg text { fill: var(--ink-3); font-size: 11px; }
   function renderResults() {
     var n = Object.keys(answers).length;
     var opts = { absentAsDisagree: $("o-absent").checked };
-    $("answered-info").textContent = n ? "Na podstawie " + n + (n === 1 ? " ustawy" : " ustaw") + ", które zaznaczyłeś." : "Zaznacz co najmniej jedną ustawę.";
+    $("answered-info").textContent = n ? "Na podstawie " + n + (n === 1 ? " zaznaczonej pozycji." : " zaznaczonych pozycji.") : "Zaznacz co najmniej jedną pozycję.";
     if (!n) { $("club-results").innerHTML = "—"; $("mp-results").innerHTML = "—"; $("mp-more").hidden = true; return; }
 
     // kluby
@@ -439,7 +456,7 @@ svg text { fill: var(--ink-3); font-size: 11px; }
     $("club-results").innerHTML = clubs.map(function (c) {
       return '<div class="result"><div class="name" title="' + esc(clubName(c.club)) + '">' + esc(c.club) + '</div><div class="pct">' + pct(c.score) + "</div>" +
         '<div class="bar"><span style="width:' + Math.round(c.score * 100) + '%"></span></div>' +
-        '<div class="sub">' + esc(clubName(c.club)) + " · " + c.bills + " z " + n + " ustaw</div></div>";
+        '<div class="sub">' + esc(clubName(c.club)) +  " · " + c.bills + " z " + n + " pozycji</div></div>";
     }).join("") || '<div class="empty">Brak danych.</div>';
 
     // posłowie

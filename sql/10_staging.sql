@@ -41,6 +41,11 @@ SELECT
     -- Rodzaj głosowania. Kolejność warunków ma znaczenie.
     CASE
         WHEN kind IS DISTINCT FROM 'ELECTRONIC'                     THEN 'inne'
+        -- immunitet: tylko głosowania wprost nad wnioskiem o zgodę (ZA = zgoda);
+        -- "przyjęcie wniosku z druku" komisji pomijamy – kierunek nieznany
+        WHEN topic_lc LIKE '%wyrażenie zgody na pociągnięcie%'      THEN 'immunitet'
+        WHEN topic_lc LIKE '%wotum nieufności%'
+          OR topic_lc LIKE '%wotum zaufania%'                        THEN 'wotum'
         -- "o uchwale Senatu", "uchwała Senatu" – głosowania nad poprawkami Senatu
         WHEN title_lc LIKE '%uchwa% senatu%'
           OR topic_lc LIKE '%senat%'                                 THEN 'senat'
@@ -82,7 +87,13 @@ SELECT
     -- Czytelny tytuł, np. "Projekt ustawy o …" albo "Weto Prezydenta do ustawy …":
     -- bez numeru punktu, prefiksu "Sprawozdanie Komisji … o", "(druki nr …)"
     -- i dopisków typu "- trzecie czytanie"; odmiana "projekcie/projektu" → "Projekt".
-    upper(left(t5, 1)) || substr(t5, 2) AS bill_title
+    CASE
+        WHEN topic_lc LIKE '%wyrażenie zgody na pociągnięcie%'
+            THEN 'Zgoda na ' || regexp_replace(topic, '^.*?wyrażenie zgody na ', '')
+        WHEN topic_lc LIKE '%wotum zaufania%'
+            THEN regexp_replace(topic, '\.$', '')
+        ELSE upper(left(t5, 1)) || substr(t5, 2)
+    END AS bill_title
 FROM (
     SELECT
         *,

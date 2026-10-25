@@ -36,6 +36,8 @@ SELECT
   *,
   CASE
     WHEN KIND IS DISTINCT FROM 'ELECTRONIC'                          THEN 'inne'
+    WHEN TOPIC ILIKE '%wyrażenie zgody na pociągnięcie%'              THEN 'immunitet'
+    WHEN TOPIC ILIKE '%wotum nieufności%' OR TOPIC ILIKE '%wotum zaufania%' THEN 'wotum'
     WHEN TITLE ILIKE '%uchwa% senatu%' OR TOPIC ILIKE '%senat%'      THEN 'senat'
     WHEN TOPIC ILIKE '%ponown% uchwal%'
       OR TOPIC ILIKE '%ponowne rozpatrzenie%'                         THEN 'weto'
