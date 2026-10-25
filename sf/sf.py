@@ -85,7 +85,7 @@ def load(con) -> None:
 
     print("PUT głosowań na stage…")
     cur.execute(f"PUT 'file://{votings}/*.json' {stage}/votings/ AUTO_COMPRESS=TRUE OVERWRITE=TRUE PARALLEL=8")
-    for name in ("mps", "clubs"):
+    for name in ("mps", "clubs", "processes"):
         cur.execute(f"PUT 'file://{(RAW / (name + '.json')).as_posix()}' {stage}/{name}/ AUTO_COMPRESS=TRUE OVERWRITE=TRUE")
 
     # COPY pamięta, które pliki już załadował – nowe i zmienione wejdą,
@@ -97,7 +97,7 @@ def load(con) -> None:
         ON_ERROR = 'ABORT_STATEMENT'
     """)
     # Słowniki to bieżący stan – podmieniamy w całości.
-    for name, table in (("mps", "MPS"), ("clubs", "CLUBS")):
+    for name, table in (("mps", "MPS"), ("clubs", "CLUBS"), ("processes", "PROCESSES")):
         cur.execute(f"TRUNCATE TABLE {DB}.RAW.{table}")
         cur.execute(f"COPY INTO {DB}.RAW.{table} (DOC) FROM (SELECT $1 FROM {stage}/{name}/) FORCE = TRUE")
 

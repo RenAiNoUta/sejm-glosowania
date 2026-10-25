@@ -162,3 +162,18 @@ SELECT
     doc ->> '$.name'                   AS club_name,
     (doc ->> '$.membersCount')::INTEGER AS members_count
 FROM raw_clubs;
+
+
+-- ---------------------------------------------------------------------
+-- Procesy legislacyjne (klucz = numer druku projektu)
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE TABLE stg_processes AS
+SELECT
+    doc ->> '$.number'                                 AS print_no,
+    coalesce((doc ->> '$.found')::BOOLEAN, FALSE)      AS found,
+    doc ->> '$.title'                                  AS process_title,
+    doc ->> '$.titleFinal'                             AS title_final,
+    nullif(trim(doc ->> '$.description'), '')          AS description,
+    doc ->> '$.documentType'                           AS document_type,
+    (doc ->> '$.passed')::BOOLEAN                      AS passed
+FROM raw_processes;

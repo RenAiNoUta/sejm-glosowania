@@ -15,3 +15,7 @@ FROM read_json_objects('data/raw/mps.json', format = 'array');
 CREATE OR REPLACE TABLE raw_clubs AS
 SELECT json AS doc
 FROM read_json_objects('data/raw/clubs.json', format = 'array');
+
+CREATE OR REPLACE TABLE raw_processes AS
+SELECT json AS doc
+FROM read_json_objects('data/raw/processes.json', format = 'array');

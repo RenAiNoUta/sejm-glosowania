@@ -37,10 +37,22 @@ class FakeApi:
         self.calls.append(("list", s))
         return {1: [{"votingNumber": 1}], 2: [{"votingNumber": n} for n in range(1, self.sitting2_count + 1)]}.get(s, [])
 
+    def process(self, num):
+        self.calls.append(("process", num))
+        if num == "404":
+            return None
+        return {"number": int(num), "title": "Projekt", "description": "projekt dotyczy czegoś",
+                "documentType": "projekt ustawy", "closureDate": "2026-01-01" if num == "100" else None,
+                "stages": [{"big": "nieistotne"}]}
+
     def voting(self, s, n):
         self.calls.append(("detail", s, n))
+        title = {1: "Pkt 1. Sprawozdanie o projekcie ustawy (druki nr 100 i 101)",
+                 2: "Pkt 2. Pierwsze czytanie projektu (druk nr 200)",
+                 3: "Pkt 3. Informacja (druk nr 404)"}.get(n, "t")
+        topic = "głosowanie nad całością projektu." if n != 2 else "wniosek o odrzucenie projektu w pierwszym czytaniu."
         return {
-            "sitting": s, "votingNumber": n, "title": "t",
+            "sitting": s, "votingNumber": n, "title": title, "topic": topic,
             "votes": [{"MP": 1, "club": "A", "vote": "YES", "firstName": "Jan", "lastName": "Kowalski"}],
         }
 
@@ -68,6 +80,33 @@ class ExtractTest(unittest.TestCase):
                 stats = extract.run(10, api=api)
                 self.assertEqual([c for c in api.calls if c[0] == "detail"], [("detail", 2, 3)])
                 self.assertEqual(len(json.loads(Path("data/raw/votings/002.json").read_text(encoding="utf-8"))), 3)
+            finally:
+                os.chdir(cwd)
+
+
+class ProcessesTest(unittest.TestCase):
+    def test_fetch_and_refresh(self):
+        from datetime import date
+        with tempfile.TemporaryDirectory() as tmp:
+            cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                api = FakeApi()
+                api.sitting2_count = 3
+                extract.run(10, api=api)
+                procs = {p["number"]: p for p in json.loads(Path("data/raw/processes.json").read_text(encoding="utf-8"))}
+                self.assertEqual(set(procs), {"100", "200", "404"})
+                self.assertEqual(procs["100"]["description"], "projekt dotyczy czegoś")
+                self.assertNotIn("stages", procs["100"])
+                self.assertFalse(procs["404"]["found"])
+
+                # ten sam dzień: nic do pobrania
+                api.calls.clear()
+                self.assertEqual(extract.fetch_processes(api), 0)
+                # po tygodniu: odświeżamy trwające (200) i nieznalezione (404), zamknięty (100) nie
+                api.calls.clear()
+                extract.fetch_processes(api, today=date.today().replace(year=date.today().year + 1))
+                self.assertEqual(sorted(c[1] for c in api.calls if c[0] == "process"), ["200", "404"])
             finally:
                 os.chdir(cwd)
 

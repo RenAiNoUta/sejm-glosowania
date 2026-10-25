@@ -46,7 +46,7 @@ SELECT * FROM dim_bills ORDER BY margin LIMIT 20;      -- najbardziej sporne
 | Ścieżka | Co robi |
 |---|---|
 | `ingest/sejm_api.py` | klient API z ponawianiem i limitem tempa |
-| `ingest/extract.py` | przyrostowe pobieranie do `data/raw/` |
+| `ingest/extract.py` | przyrostowe pobieranie do `data/raw/` (głosowania, posłowie, kluby, opisy procesów legislacyjnych) |
 | `sql/00_raw.sql` | surowe dokumenty JSON (`read_json_objects`) |
 | `sql/10_staging.sql` | typowanie, rozbicie listy głosów, **klasyfikacja głosowań** |
 | `sql/20_marts.sql` | ustawy, stanowiska posłów, frekwencja, lojalność, zgodność klubów |

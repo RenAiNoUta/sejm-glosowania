@@ -106,7 +106,7 @@ WITH ranked AS (
 )
 SELECT
     bill_id,
-    print_no,
+    ranked.print_no,
     bill_title       AS title,
     CASE WHEN category IN ('immunitet', 'wotum') THEN NULL ELSE author_type END AS author_type,
     category         AS final_category,
@@ -129,8 +129,13 @@ SELECT
             ELSE CASE WHEN yes_votes > no_votes THEN 'wotum zaufania udzielone' ELSE 'wotum zaufania nieudzielone' END
         END
     END AS outcome,
-    abs(yes_votes - no_votes) AS margin
+    abs(yes_votes - no_votes) AS margin,
+    -- oficjalny krótki opis projektu z API ("projekt dotyczy …")
+    p.description,
+    p.document_type,
+    coalesce(p.found, FALSE) AS has_process
 FROM ranked
+LEFT JOIN stg_processes p ON p.print_no = ranked.print_no
 WHERE rn = 1;
 
 

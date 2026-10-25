@@ -138,6 +138,29 @@ svg text { fill: var(--ink-3); font-size: 11px; }
 .note { font-size: 13px; color: var(--ink-2); background: var(--surface-2); border-radius: 8px; padding: 10px 12px; margin-top: 12px; }
 #tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12.5px; padding: 5px 8px; border-radius: 6px; opacity: 0; transition: opacity .1s; z-index: 10; }
 .loading { padding: 40px 0; color: var(--ink-3); }
+.info {
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: 2px;
+  width: 18px; height: 18px; margin-left: 6px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--ink-3); background: transparent; color: var(--ink-2);
+  font: italic 600 11px/1 Georgia, "Source Serif 4", serif; cursor: pointer;
+}
+.info:hover, .info[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+#pop {
+  position: fixed; z-index: 20; width: min(380px, calc(100vw - 32px)); max-height: min(70vh, 520px); overflow: auto;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 14px 16px 12px; font-size: 14px;
+}
+#pop[hidden] { display: none; }
+#pop h3 { font-size: 16px; margin: 0 26px 8px 0; }
+#pop p { margin: 0 0 10px; color: var(--ink-2); }
+#pop .src { font-size: 12px; color: var(--ink-3); margin-top: -6px; }
+#pop dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0 0 10px; font-size: 13px; }
+#pop dt { color: var(--ink-3); }
+#pop dd { margin: 0; }
+#pop .links { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; }
+#pop .x { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border: 0; border-radius: 6px;
+  background: none; color: var(--ink-3); font-size: 20px; line-height: 1; cursor: pointer; }
+#pop .x:hover { background: var(--surface-2); color: var(--ink); }
 </style>
 </head>
 <body>
@@ -289,6 +312,7 @@ svg text { fill: var(--ink-3); font-size: 11px; }
   </section>
 </main>
 <div id="tip"></div>
+<div id="pop" role="dialog" aria-modal="false" hidden></div>
 
 <script src="score.js"></script>
 <script>
@@ -387,6 +411,8 @@ svg text { fill: var(--ink-3); font-size: 11px; }
       if (!Object.keys(answers).length || confirm("Wyczyścić wszystkie odpowiedzi?")) { answers = {}; saveAnswers(); renderBills(); renderResults(); }
     });
     $("bills").addEventListener("click", function (e) {
+      var info = e.target.closest("button[data-info]");
+      if (info) { e.stopPropagation(); togglePop(info); return; }
       var btn = e.target.closest("button[data-v]");
       if (!btn) return;
       var id = btn.dataset.id, v = Number(btn.dataset.v);
@@ -421,7 +447,8 @@ svg text { fill: var(--ink-3); font-size: 11px; }
     var a = answers[b.id];
     var link = b.print ? '<a href="https://www.sejm.gov.pl/Sejm10.nsf/druk.xsp?nr=' + encodeURIComponent(b.print) + '" target="_blank" rel="noopener">druk nr ' + esc(b.print) + "</a>" : "";
     return '<div class="bill">' +
-      '<div class="t">' + esc(b.title) + "</div>" +
+      '<div class="t">' + esc(b.title) +
+        '<button class="info" type="button" data-info="' + esc(b.id) + '" aria-label="Więcej o tej pozycji" aria-expanded="false">i</button></div>' +
       '<div class="sub">' + (KIND_LABEL[b.cat] ? '<span class="tag kind">' + KIND_LABEL[b.cat] + "</span>" : "") +
         "<span>" + fmtDate(b.date) + "</span>" +
         (b.outcome ? '<span class="tag">' + esc(b.outcome) + "</span>" : "") +
@@ -490,6 +517,69 @@ svg text { fill: var(--ink-3); font-size: 11px; }
       return '<li><b class="' + cls + '">' + labels[ch] + "</b><span>" + esc(D.billIndex[id].title) + " <span class='mid'>(Ty: " + (u === 1 ? "chcę" : "nie chcę") + ")</span></span></li>";
     }).join("") + "</ul>";
   }
+
+  // ---------- okienko z opisem ----------
+  var pop = $("pop"), popFor = null;
+  var KIND_INFO = {
+    immunitet: "Głosowanie nad wnioskiem o zgodę Sejmu na pociągnięcie osoby objętej immunitetem do odpowiedzialności. " +
+      "„Chcę, żeby przeszło” oznacza zgodę. Wymagana jest bezwzględna większość ustawowej liczby posłów (231 głosów).",
+    wotum: "Wotum nieufności wobec ministra przechodzi, jeśli poprze je co najmniej 231 posłów – wtedy minister zostaje odwołany. " +
+      "Wotum zaufania dla rządu wymaga zwykłej większości.",
+    weto: "Prezydent zwrócił ustawę do ponownego rozpatrzenia. Sejm może odrzucić weto większością 3/5 głosów – " +
+      "„Chcę, żeby przeszło” oznacza ponowne uchwalenie ustawy mimo weta."
+  };
+  function capFirst(s) { s = String(s || "").trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
+
+  function popHTML(b) {
+    var parts = ['<button class="x" type="button" aria-label="Zamknij">×</button>', "<h3>" + esc(b.title) + "</h3>"];
+    if (KIND_INFO[b.cat]) parts.push("<p>" + esc(KIND_INFO[b.cat]) + "</p>");
+    if (b.desc) {
+      parts.push("<p>" + esc(capFirst(b.desc)) + "</p>", '<p class="src">Opis: Kancelaria Sejmu (API Sejmu)</p>');
+    } else if (!KIND_INFO[b.cat] || b.cat === "weto") {
+      parts.push('<p class="src">Sejm nie udostępnił krótkiego opisu tego projektu – szczegóły w druku sejmowym.</p>');
+    }
+    var meta = [];
+    if (b.docType) meta.push(["Rodzaj", capFirst(b.docType)]);
+    if (b.author) meta.push(["Wnioskodawca", "projekt " + b.author]);
+    if (b.outcome) meta.push(["Wynik", b.outcome]);
+    meta.push(["Głosy", "za " + b.yes + " · przeciw " + b.no + " · wstrz. " + b.abst]);
+    meta.push([b.n > 1 ? "Ostatnie głosowanie" : "Głosowanie", fmtDate(b.date)]);
+    parts.push("<dl>" + meta.map(function (m) { return "<dt>" + m[0] + "</dt><dd>" + esc(m[1]) + "</dd>"; }).join("") + "</dl>");
+    var links = [];
+    if (b.print && b.proc) links.push('<a href="https://www.sejm.gov.pl/Sejm10.nsf/PrzebiegProc.xsp?nr=' + encodeURIComponent(b.print) + '" target="_blank" rel="noopener">Przebieg procesu legislacyjnego</a>');
+    if (b.print) links.push('<a href="https://www.sejm.gov.pl/Sejm10.nsf/druk.xsp?nr=' + encodeURIComponent(b.print) + '" target="_blank" rel="noopener">Druk nr ' + esc(b.print) + "</a>");
+    if (links.length) parts.push('<div class="links">' + links.join("") + "</div>");
+    return parts.join("");
+  }
+
+  function closePop() {
+    if (popFor) popFor.setAttribute("aria-expanded", "false");
+    popFor = null; pop.hidden = true;
+  }
+  function togglePop(btn) {
+    var b = D.billIndex[btn.dataset.info];
+    if (!b) return;
+    if (popFor && popFor.dataset.info === btn.dataset.info) { closePop(); return; }
+    closePop();
+    pop.innerHTML = popHTML(b);
+    pop.hidden = false;
+    popFor = btn; btn.setAttribute("aria-expanded", "true");
+    var r = btn.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+    var left = Math.max(16, Math.min(window.innerWidth - w - 16, r.left - 20));
+    var top = r.bottom + 8;
+    if (top + h > window.innerHeight - 12) top = Math.max(12, r.top - h - 8);
+    pop.style.left = left + "px"; pop.style.top = top + "px";
+    popScrollY = window.scrollY;
+    pop.querySelector(".x").focus({ preventScroll: true });
+  }
+  pop.addEventListener("click", function (e) { if (e.target.closest(".x")) { var f = popFor; closePop(); if (f) f.focus(); } });
+  document.addEventListener("click", function (e) { if (!pop.hidden && !pop.contains(e.target)) closePop(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !pop.hidden) { var f = popFor; closePop(); if (f) f.focus(); } });
+  // drobne przewinięcia (np. przy dotknięciu na telefonie) nie zamykają okienka
+  var popScrollY = 0;
+  window.addEventListener("scroll", function () {
+    if (!pop.hidden && Math.abs(window.scrollY - popScrollY) > 80) closePop();
+  }, { passive: true });
 
   // ---------- statystyki ----------
   var statsDone = false;

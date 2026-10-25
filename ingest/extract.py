@@ -6,6 +6,8 @@ Układ plików (to jest warstwa "raw" – zapisujemy odpowiedzi API prawie bez z
     data/raw/clubs.json          kluby i koła (nadpisywane)
     data/raw/proceedings.json    posiedzenia (nadpisywane)
     data/raw/votings/NNN.json    wszystkie głosowania posiedzenia NNN z głosami posłów
+    data/raw/processes.json      procesy legislacyjne projektów, nad którymi głosowano
+                                 merytorycznie (krótki opis, rodzaj dokumentu, status)
 
 Jedyna zmiana względem API: z listy głosów usuwamy imiona i nazwiska
 (są w mps.json), co zmniejsza pliki mniej więcej o połowę.
@@ -23,7 +25,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from concurrent.futures import ThreadPoolExecutor
+from datetime import date, timedelta
 from pathlib import Path
 
 from ingest.sejm_api import SejmApi
@@ -31,6 +35,14 @@ from ingest.sejm_api import SejmApi
 RAW_DIR = Path("data/raw")
 VOTE_KEYS_TO_KEEP = ("MP", "club", "vote", "listVotes")
 PROGRESS_EVERY = 50  # co ile pobranych głosowań wypisać postęp
+
+# Głosowania, dla których warto pobrać opis projektu (to samo, co model
+# uznaje za merytoryczne – zob. sql/10_staging.sql).
+SUBSTANTIVE_TOPIC = re.compile(r"nad całością|odrzucenie|ponown|wotum", re.IGNORECASE)
+PRINT_NO = re.compile(r"druk\S*\s+nr\s+(\d+)", re.IGNORECASE)
+PROCESS_KEYS = ("number", "title", "titleFinal", "description", "documentType",
+                "passed", "processStartDate", "closureDate", "UE", "urgencyStatus")
+PROCESS_REFRESH_DAYS = 7  # trwające procesy i brakujące numery sprawdzamy co tydzień
 
 
 def write_json(path: Path, data) -> None:
@@ -118,7 +130,68 @@ def run(term: int, full: bool = False, api: SejmApi | None = None, workers: int 
         f"Gotowe. Sprawdzono {stats['sittings_checked']} posiedzeń, "
         f"zaktualizowano {stats['sittings_fetched']}, pobrano {stats['votings_fetched']} głosowań."
     )
+    stats["processes_fetched"] = fetch_processes(api, workers, full)
     return stats
+
+
+def wanted_print_numbers() -> set[str]:
+    """Numery druków z tytułów głosowań merytorycznych."""
+    numbers = set()
+    for path in sorted((RAW_DIR / "votings").glob("*.json")):
+        for v in load_existing(path) or []:
+            if SUBSTANTIVE_TOPIC.search(v.get("topic") or ""):
+                m = PRINT_NO.search(v.get("title") or "")
+                if m:
+                    numbers.add(m.group(1))
+    return numbers
+
+
+def fetch_processes(api, workers: int = 4, full: bool = False, today: date | None = None) -> int:
+    """Dociąga opisy procesów legislacyjnych do data/raw/processes.json.
+
+    Pobieramy nowe numery, a co PROCESS_REFRESH_DAYS dni ponownie te, które
+    jeszcze trwają albo których API wcześniej nie znało.
+    """
+    today = today or date.today()
+    path = RAW_DIR / "processes.json"
+    known = {p["number"]: p for p in (None if full else load_existing(path)) or []}
+    stale_before = (today - timedelta(days=PROCESS_REFRESH_DAYS)).isoformat()
+
+    def needs_fetch(num: str) -> bool:
+        p = known.get(num)
+        if p is None:
+            return True
+        finished = p.get("found") and p.get("closureDate")
+        return not finished and p.get("fetchedAt", "") < stale_before
+
+    todo = sorted((n for n in wanted_print_numbers() if needs_fetch(n)), key=int)
+    if not todo:
+        if not path.exists():
+            write_json(path, [])  # model w DuckDB oczekuje pliku, nawet pustego
+        print("Procesy legislacyjne: nic nowego.")
+        return 0
+    print(f"Procesy legislacyjne do pobrania: {len(todo)}")
+
+    def fetch(num: str) -> dict:
+        data = api.process(num)
+        if not data:
+            return {"number": num, "found": False, "fetchedAt": today.isoformat()}
+        slim = {k: data.get(k) for k in PROCESS_KEYS}
+        slim.update(number=num, found=True, fetchedAt=today.isoformat())
+        return slim
+
+    done = 0
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        for proc in pool.map(fetch, todo):
+            known[proc["number"]] = proc
+            done += 1
+            if done % PROGRESS_EVERY == 0:
+                print(f"  … procesy: {done}/{len(todo)}")
+                write_json(path, sorted(known.values(), key=lambda p: int(p["number"])))
+    write_json(path, sorted(known.values(), key=lambda p: int(p["number"])))
+    found = sum(1 for p in known.values() if p.get("found"))
+    print(f"Procesy legislacyjne: pobrano {done}, w pliku {len(known)} (z opisem w API: {found}).")
+    return done
 
 
 def main() -> None:

@@ -128,7 +128,7 @@ def export(con) -> None:
         SELECT bill_id AS id, print_no AS print, title, author_type AS author,
                final_category AS cat, final_vote_at AS date, first_vote_at AS first,
                n_votings AS n, yes_votes AS yes, no_votes AS no, abstain_votes AS abst,
-               outcome, margin
+               outcome, margin, description AS "desc", document_type AS "docType", has_process AS proc
         FROM dim_bills ORDER BY final_vote_at DESC
     """)
 

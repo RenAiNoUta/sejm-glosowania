@@ -76,3 +76,11 @@ class SejmApi:
     def voting(self, sitting: int, number: int):
         """Szczegóły głosowania razem z listą głosów posłów."""
         return self._get(f"/votings/{sitting}/{number}")
+
+    # --- procesy legislacyjne ------------------------------------------------
+    def process(self, number: str):
+        """Przebieg procesu legislacyjnego (m.in. krótki opis "projekt dotyczy…").
+
+        Numer procesu to numer druku projektu. Zwraca None, gdy procesu nie ma.
+        """
+        return self._get(f"/processes/{number}", allow_404=True)
