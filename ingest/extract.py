@@ -14,13 +14,16 @@ Przyrostowość: dla każdego posiedzenia pobieramy tylko listę głosowań
 (jedno lekkie zapytanie) i dociągamy szczegóły wyłącznie tych głosowań,
 których jeszcze nie mamy. Wynik raz zakończonego głosowania się nie zmienia.
 
-Uruchomienie:  python -m ingest.extract [--term 10] [--full]
+Szczegóły głosowań pobieramy równolegle (domyślnie 4 zapytania naraz).
+
+Uruchomienie:  python -m ingest.extract [--term 10] [--full] [--workers 4]
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from ingest.sejm_api import SejmApi
@@ -63,7 +66,7 @@ def load_existing(path: Path) -> list[dict] | None:
         return None
 
 
-def run(term: int, full: bool = False, api: SejmApi | None = None) -> dict:
+def run(term: int, full: bool = False, api: SejmApi | None = None, workers: int = 4) -> dict:
     api = api or SejmApi(term=term)
     stats = {"sittings_checked": 0, "sittings_fetched": 0, "votings_fetched": 0}
 
@@ -88,20 +91,24 @@ def run(term: int, full: bool = False, api: SejmApi | None = None) -> dict:
             continue
 
         have = {v["votingNumber"]: v for v in existing or []}
-        result = []
-        for item in sorted(listing, key=lambda v: v["votingNumber"]):
-            num = item["votingNumber"]
-            if num in have:
-                result.append(have[num])
-                continue
-            result.append(slim_voting(api.voting(sitting, num)))
-            stats["votings_fetched"] += 1
-            if stats["votings_fetched"] % PROGRESS_EVERY == 0:
-                print(
-                    f"  … pobrano {stats['votings_fetched']} głosowań "
-                    f"(posiedzenie {sitting}, {pos}/{len(sittings)})"
-                )
+        numbers = sorted(item["votingNumber"] for item in listing)
+        missing = [n for n in numbers if n not in have]
 
+        def fetch(num: int) -> dict:
+            return slim_voting(api.voting(sitting, num))
+
+        # map() zachowuje kolejność, a wyniki przychodzą w miarę pobierania.
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+            for num, voting in zip(missing, pool.map(fetch, missing)):
+                have[num] = voting
+                stats["votings_fetched"] += 1
+                if stats["votings_fetched"] % PROGRESS_EVERY == 0:
+                    print(
+                        f"  … pobrano {stats['votings_fetched']} głosowań "
+                        f"(posiedzenie {sitting}, {pos}/{len(sittings)})"
+                    )
+
+        result = [have[n] for n in numbers]
         write_json(path, result)
         stats["sittings_fetched"] += 1
         print(f"  posiedzenie {sitting} ({pos}/{len(sittings)}): {len(result)} głosowań, "
@@ -118,8 +125,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--term", type=int, default=10, help="kadencja Sejmu (domyślnie 10)")
     parser.add_argument("--full", action="store_true", help="pobierz wszystko od nowa")
+    parser.add_argument("--workers", type=int, default=4, help="ile zapytań równolegle (domyślnie 4)")
     args = parser.parse_args()
-    run(args.term, args.full)
+    run(args.term, args.full, workers=args.workers)
 
 
 if __name__ == "__main__":

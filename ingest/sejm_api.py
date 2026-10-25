@@ -1,12 +1,14 @@
 """Minimalny klient API Sejmu (https://api.sejm.gov.pl).
 
 API jest publiczne i nie wymaga klucza. Klient dodaje:
-- ponawianie zapytań przy błędach 429/5xx z rosnącym odstępem,
-- mały odstęp między zapytaniami, żeby nie obciążać serwera Sejmu.
+- ponawianie zapytań przy błędach 429/5xx i błędach sieci z rosnącym odstępem,
+- mały odstęp między zapytaniami, żeby nie obciążać serwera Sejmu,
+- osobną sesję HTTP dla każdego wątku (bezpieczne pobieranie równoległe).
 """
 
 from __future__ import annotations
 
+import threading
 import time
 
 import requests
@@ -20,13 +22,30 @@ class SejmApi:
         self.term = term
         self.delay = delay
         self.max_retries = max_retries
-        self.session = session or requests.Session()
-        self.session.headers.update({"User-Agent": USER_AGENT, "Accept": "application/json"})
+        self._shared_session = session  # do testów
+        self._local = threading.local()
+
+    @property
+    def session(self):
+        if self._shared_session is not None:
+            return self._shared_session
+        s = getattr(self._local, "session", None)
+        if s is None:
+            s = requests.Session()
+            s.headers.update({"User-Agent": USER_AGENT, "Accept": "application/json"})
+            self._local.session = s
+        return s
 
     def _get(self, path: str, allow_404: bool = False):
         url = f"{BASE_URL}/term{self.term}{path}"
         for attempt in range(1, self.max_retries + 1):
-            resp = self.session.get(url, timeout=30)
+            try:
+                resp = self.session.get(url, timeout=60)
+            except (requests.ConnectionError, requests.Timeout) as exc:
+                wait = min(60, 2**attempt)
+                print(f"  błąd sieci dla {url} ({type(exc).__name__}), ponawiam za {wait}s (próba {attempt})")
+                time.sleep(wait)
+                continue
             if resp.status_code == 404 and allow_404:
                 return None
             if resp.status_code in (429, 500, 502, 503, 504):
