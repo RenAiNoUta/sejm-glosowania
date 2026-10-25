@@ -359,7 +359,7 @@ svg text { fill: var(--ink-3); font-size: 11px; }
 
   function init() {
     var m = D.meta;
-    $("meta").textContent = "Sejm X kadencji · " + m.bills + " projektów, " + m.votings + " głosowań, ostatnie: " +
+    $("meta").textContent = "Sejm X kadencji · " + m.bills + " pozycji do wyboru, " + m.votings + " głosowań, ostatnie: " +
       fmtDate(m.lastVote) + " (posiedzenie " + m.lastSitting + ") · dane z " + fmtDate(m.generatedAt);
 
     var authors = {};
@@ -438,8 +438,8 @@ svg text { fill: var(--ink-3); font-size: 11px; }
 
   function renderBills() {
     var list = filteredBills();
-    $("bill-count").textContent = list.length + " z " + D.bills.length + " projektów";
-    $("bills").innerHTML = list.length ? list.slice(0, shown).map(billHTML).join("") : '<div class="empty">Brak projektów dla tych filtrów.</div>';
+    $("bill-count").textContent = list.length + " z " + D.bills.length + " pozycji";
+    $("bills").innerHTML = list.length ? list.slice(0, shown).map(billHTML).join("") : '<div class="empty">Brak pozycji dla tych filtrów.</div>';
     $("more").hidden = list.length <= shown;
   }
 
