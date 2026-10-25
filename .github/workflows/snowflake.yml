@@ -24,7 +24,7 @@ jobs:
     env:
       SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
       SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-      SNOWFLAKE_PRIVATE_KEY_PATH: ${{ runner.temp }}/rsa_key.p8
+      SNOWFLAKE_PRIVATE_KEY_PATH: /home/runner/rsa_key.p8   # poza katalogiem repo
       SNOWFLAKE_PRIVATE_KEY_PASSPHRASE: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}
     steps:
       - uses: actions/checkout@v4
