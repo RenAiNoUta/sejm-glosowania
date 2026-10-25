@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jak głosował Sejm</title>
+<meta name="description" content="Porównaj swoje stanowisko w sprawie ustaw z tym, jak faktycznie głosowali posłowie i kluby Sejmu X kadencji.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f6f4ef;
+  --surface: #ffffff;
+  --surface-2: #efece4;
+  --ink: #1c1c1a;
+  --ink-2: #55544f;
+  --ink-3: #8a8880;
+  --line: #dedad0;
+  --accent: #1f5f6b;
+  --accent-soft: #d8e8ea;
+  --yes: #2d6a4f;
+  --yes-soft: #dcebe2;
+  --no: #8a3b2e;
+  --no-soft: #f1ddd8;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 14px rgba(0,0,0,.04);
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141513; --surface: #1d1e1b; --surface-2: #262723; --ink: #ecebe6; --ink-2: #b5b3ab;
+    --ink-3: #85837b; --line: #34352f; --accent: #7fc1cb; --accent-soft: #1f3a3f;
+    --yes: #8fd1ad; --yes-soft: #1f3529; --no: #e7a294; --no-soft: #3c2420;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141513; --surface: #1d1e1b; --surface-2: #262723; --ink: #ecebe6; --ink-2: #b5b3ab;
+  --ink-3: #85837b; --line: #34352f; --accent: #7fc1cb; --accent-soft: #1f3a3f;
+  --yes: #8fd1ad; --yes-soft: #1f3529; --no: #e7a294; --no-soft: #3c2420;
+  --shadow: none;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+a { color: var(--accent); }
+h1, h2, h3 { font-family: "Source Serif 4", Georgia, serif; font-weight: 700; line-height: 1.2; margin: 0; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+
+header.top { padding: 28px 0 14px; border-bottom: 1px solid var(--line); }
+header.top h1 { font-size: clamp(26px, 4vw, 38px); }
+header.top p { margin: 6px 0 0; color: var(--ink-2); max-width: 720px; }
+.meta { font-size: 13px; color: var(--ink-3); margin-top: 8px; }
+
+nav.tabs { display: flex; gap: 4px; margin: 18px 0 0; overflow-x: auto; }
+nav.tabs button {
+  font: inherit; font-weight: 500; border: 0; background: none; color: var(--ink-2);
+  padding: 10px 14px; border-radius: 8px 8px 0 0; cursor: pointer; white-space: nowrap;
+}
+nav.tabs button[aria-selected="true"] { color: var(--ink); background: var(--surface); box-shadow: var(--shadow); }
+main { padding: 18px 0 60px; }
+.panel { display: none; }
+.panel.active { display: block; }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.card > .hd { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.card > .hd h2 { font-size: 19px; }
+.card > .hd p { margin: 4px 0 0; color: var(--ink-2); font-size: 13.5px; }
+.card > .bd { padding: 12px 16px 16px; }
+.sticky { position: sticky; top: 12px; }
+@media (max-width: 900px) { .sticky { position: static; } }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+input[type="search"], select {
+  font: inherit; font-size: 14px; color: var(--ink); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0;
+}
+input[type="search"] { flex: 1 1 220px; }
+label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 13.5px; color: var(--ink-2); cursor: pointer; }
+
+.bill { padding: 12px 0; border-top: 1px solid var(--line); }
+.bill:first-child { border-top: 0; }
+.bill .t { font-weight: 500; }
+.bill .sub { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.bill .acts { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.pill {
+  font: inherit; font-size: 13px; font-weight: 500; padding: 5px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); cursor: pointer;
+}
+.pill:hover { border-color: var(--ink-3); }
+.pill.on.yes { background: var(--yes-soft); border-color: var(--yes); color: var(--yes); }
+.pill.on.no  { background: var(--no-soft);  border-color: var(--no);  color: var(--no); }
+.tag { display: inline-block; font-size: 11.5px; padding: 1px 7px; border-radius: 4px; background: var(--surface-2); color: var(--ink-2); }
+.more { margin-top: 10px; }
+.btn {
+  font: inherit; font-size: 14px; font-weight: 500; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+}
+.btn.link { background: none; border: 0; color: var(--accent); padding: 4px 0; }
+
+.empty { color: var(--ink-3); font-size: 14px; padding: 8px 0; }
+.result { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 9px 0; border-top: 1px solid var(--line); align-items: center; }
+.result:first-child { border-top: 0; }
+.result .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+.result .pct { font-variant-numeric: tabular-nums; font-weight: 600; }
+.result .sub { font-size: 12.5px; color: var(--ink-3); grid-column: 1 / -1; }
+.bar { grid-column: 1 / -1; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--accent); }
+.result details { grid-column: 1 / -1; font-size: 13px; }
+.result summary { cursor: pointer; color: var(--accent); font-size: 12.5px; }
+.cmp { list-style: none; margin: 6px 0 0; padding: 0; }
+.cmp li { display: flex; gap: 8px; padding: 3px 0; color: var(--ink-2); }
+.cmp b { min-width: 72px; font-weight: 500; }
+.ok { color: var(--yes); } .bad { color: var(--no); } .mid { color: var(--ink-3); }
+.section-t { font-size: 15px; font-weight: 600; font-family: Inter, sans-serif; margin: 16px 0 4px; }
+
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+@media (max-width: 900px) { .stats { grid-template-columns: 1fr; } }
+.stats .wide { grid-column: 1 / -1; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { text-align: left; padding: 6px 6px; border-top: 1px solid var(--line); }
+th { font-weight: 600; color: var(--ink-2); border-top: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.scroll-x { overflow-x: auto; }
+.heat td { text-align: center; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--ink-2); margin-top: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+svg text { fill: var(--ink-3); font-size: 11px; }
+.prose { max-width: 760px; }
+.prose h2 { font-size: 22px; margin: 22px 0 8px; }
+.prose p, .prose li { color: var(--ink-2); }
+.note { font-size: 13px; color: var(--ink-2); background: var(--surface-2); border-radius: 8px; padding: 10px 12px; margin-top: 12px; }
+#tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12.5px; padding: 5px 8px; border-radius: 6px; opacity: 0; transition: opacity .1s; z-index: 10; }
+.loading { padding: 40px 0; color: var(--ink-3); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <h1>Jak głosował Sejm</h1>
+    <p>Zaznacz, które ustawy chcesz, a których nie. Zobaczysz, kto w Sejmie X kadencji faktycznie głosował najbardziej zgodnie z Twoimi wyborami.</p>
+    <div class="meta" id="meta">Ładowanie danych…</div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="match">Dopasowanie</button>
+      <button role="tab" aria-selected="false" data-tab="stats">Statystyki</button>
+      <button role="tab" aria-selected="false" data-tab="method">Jak to liczymy</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- ================= DOPASOWANIE ================= -->
+  <section class="panel active" id="panel-match">
+    <div class="grid">
+      <div class="card">
+        <div class="hd">
+          <h2>Ustawy i uchwały</h2>
+          <p>Wszystkie projekty, nad którymi Sejm głosował merytorycznie. Odpowiadasz na pytanie: czy chcesz, żeby to przeszło?</p>
+        </div>
+        <div class="bd">
+          <div class="controls">
+            <input type="search" id="q" placeholder="Szukaj w tytułach, np. podatek, szkoła, energia…" aria-label="Szukaj ustawy">
+            <select id="f-outcome" aria-label="Wynik">
+              <option value="">Każdy wynik</option>
+              <option value="przyjęto">Przyjęte</option>
+              <option value="odrzucono">Odrzucone</option>
+              <option value="projekt odrzucony">Odrzucone w czytaniu</option>
+              <option value="weto">Weto</option>
+              <option value="w toku">W toku</option>
+            </select>
+            <select id="f-author" aria-label="Wnioskodawca"><option value="">Każdy wnioskodawca</option></select>
+            <select id="f-sort" aria-label="Sortowanie">
+              <option value="date">Najnowsze</option>
+              <option value="margin">Najbardziej sporne</option>
+            </select>
+            <label class="chk"><input type="checkbox" id="f-answered"> tylko moje odpowiedzi</label>
+          </div>
+          <div id="bill-count" class="meta" style="margin:0 0 4px"></div>
+          <div id="bills"></div>
+          <div class="more"><button class="btn" id="more" hidden>Pokaż więcej</button></div>
+        </div>
+      </div>
+
+      <div class="sticky">
+        <div class="card">
+          <div class="hd">
+            <h2>Kto głosował jak Ty</h2>
+            <p id="answered-info">Zaznacz co najmniej jedną ustawę.</p>
+          </div>
+          <div class="bd">
+            <div class="controls">
+              <label class="chk"><input type="checkbox" id="o-absent"> nieobecność liczę jako niezgodność</label>
+              <button class="btn link" id="reset" type="button">wyczyść odpowiedzi</button>
+            </div>
+            <h3 class="section-t">Kluby</h3>
+            <div id="club-results" class="empty">—</div>
+            <h3 class="section-t">Posłowie</h3>
+            <div class="controls">
+              <select id="o-district" aria-label="Okręg"><option value="">Wszystkie okręgi</option></select>
+              <select id="o-club" aria-label="Klub"><option value="">Wszystkie kluby</option></select>
+              <label class="chk"><input type="checkbox" id="o-active" checked> tylko obecni posłowie</label>
+            </div>
+            <div id="mp-results" class="empty">—</div>
+            <button class="btn link" id="mp-more" hidden>pokaż więcej posłów</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= STATYSTYKI ================= -->
+  <section class="panel" id="panel-stats">
+    <div class="stats">
+      <div class="card wide">
+        <div class="hd">
+          <h2>Mapa podobieństwa posłów</h2>
+          <p>Każda kropka to poseł. Im bliżej siebie, tym podobniej głosowali nad ustawami (analiza głównych składowych). Kolor = obecny klub. Osie same w sobie nic nie znaczą.</p>
+        </div>
+        <div class="bd"><div id="pca"></div><div class="legend" id="pca-legend"></div></div>
+      </div>
+      <div class="card">
+        <div class="hd"><h2>Najczęściej wbrew klubowi</h2><p>Odsetek głosów innych niż większość własnego klubu (obecni posłowie, min. 200 głosów).</p></div>
+        <div class="bd scroll-x" id="loyalty"></div>
+      </div>
+      <div class="card">
+        <div class="hd"><h2>Najniższa frekwencja</h2><p>Udział w głosowaniach elektronicznych (obecni posłowie, min. 200 głosowań).</p></div>
+        <div class="bd scroll-x" id="attendance"></div>
+      </div>
+      <div class="card wide">
+        <div class="hd"><h2>Zgodność klubów</h2><p>Jak często większość jednego klubu zajmowała to samo stanowisko wobec ustawy co większość drugiego.</p></div>
+        <div class="bd scroll-x" id="alignment"></div>
+      </div>
+      <div class="card">
+        <div class="hd"><h2>Skuteczność wnioskodawców</h2><p>Projekty, których los rozstrzygnął się w głosowaniu nad całością lub nad odrzuceniem.</p></div>
+        <div class="bd scroll-x" id="authors"></div>
+      </div>
+      <div class="card">
+        <div class="hd"><h2>O której się głosuje</h2><p>Liczba głosowań elektronicznych według godziny.</p></div>
+        <div class="bd" id="hours"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= METODOLOGIA ================= -->
+  <section class="panel" id="panel-method">
+    <div class="prose">
+      <h2>Skąd są dane</h2>
+      <p>Wszystkie dane pochodzą z oficjalnego <a href="https://api.sejm.gov.pl/" rel="noopener">API Sejmu RP</a> i są odświeżane automatycznie raz dziennie. Kod całego projektu jest otwarty.</p>
+
+      <h2>Które głosowania się liczą</h2>
+      <p>Na jednym posiedzeniu Sejm głosuje kilkadziesiąt razy, ale większość to poprawki i wnioski proceduralne. Na liście ustaw uwzględniamy tylko głosowania merytoryczne:</p>
+      <ul>
+        <li><b>nad całością projektu</b> – głos ZA oznacza poparcie ustawy,</li>
+        <li><b>nad wnioskiem o odrzucenie projektu</b> – głos ZA oznacza sprzeciw wobec ustawy (kierunek odwracamy),</li>
+        <li><b>nad ponownym uchwaleniem ustawy po wecie</b> – głos ZA oznacza poparcie ustawy. Ustawa po wecie ma osobny numer druku, więc występuje na liście jako osobna pozycja.</li>
+      </ul>
+      <p>Głosowania są grupowane po numerze druku sejmowego. Jeśli nad jedną ustawą było kilka głosowań merytorycznych, bierzemy <b>ostatni głos, który poseł faktycznie oddał</b>. Klasyfikacja opiera się na tytułach głosowań, więc może się zdarzyć pomyłka – w repozytorium jest raport, który pomaga to sprawdzać.</p>
+
+      <h2>Jak liczona jest zgodność</h2>
+      <ul>
+        <li>Ten sam kierunek co Ty: 1 punkt. Wstrzymanie się: ½ punktu. Przeciwny kierunek: 0.</li>
+        <li>Wynik to średnia z ustaw, przy których poseł był w Sejmie i głosował.</li>
+        <li>Nieobecność domyślnie się nie liczy, ale możesz to zmienić – wtedy nieobecność liczy się jak głos przeciwny Twojemu.</li>
+        <li>Dla klubu liczymy, jaka część jego członków głosowała zgodnie z Tobą, a potem uśredniamy po ustawach. Przynależność klubowa jest brana z dnia głosowania, więc posłowie, którzy zmienili klub, są liczeni tam, gdzie byli w danym momencie.</li>
+      </ul>
+
+      <h2>Czego ten wynik nie mówi</h2>
+      <p>Pokazujemy, kto <b>w tej kadencji głosował</b> zgodnie z Twoimi wyborami – nie oceniamy programów ani nie przewidujemy, jak ktoś zagłosuje w przyszłości. Ustawy często łączą wiele spraw naraz, więc jeden głos przeciw nie mówi, który element zdecydował. Na wynik wpływa też to, które ustawy zaznaczysz: im więcej i różnorodniejszych, tym pełniejszy obraz.</p>
+      <p>Nie dobieramy ustaw za Ciebie i nie ważymy ich – lista obejmuje wszystkie projekty z głosowaniem merytorycznym, w oficjalnym brzmieniu tytułów.</p>
+    </div>
+  </section>
+</main>
+<div id="tip"></div>
+
+<script src="score.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "sejm-glosowania:answers:v1";
+  var PAGE = 40;
+  var PALETTE = ["#4e79a7", "#f28e2b", "#59a14f", "#b07aa1", "#76b7b2", "#edc948", "#9c755f", "#e15759", "#bab0ac", "#ff9da7"];
+
+  var D = {};             // dane
+  var answers = loadAnswers();
+  var shown = PAGE, mpShown = 25;
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- pomocnicze ----------
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function pct(x) { return x == null ? "—" : Math.round(x * 100) + "%"; }
+  function fmtDate(s) {
+    if (!s) return "";
+    var d = new Date(String(s).replace(" ", "T"));
+    return isNaN(d) ? String(s).slice(0, 10) : d.toLocaleDateString("pl-PL", { day: "numeric", month: "short", year: "numeric" });
+  }
+  function norm(s) { return String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ł/g, "l"); }
+  function loadAnswers() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch (e) { return {}; }
+  }
+  function saveAnswers() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(answers)); } catch (e) { /* tryb prywatny */ }
+  }
+  function clubName(id) { return (D.clubIndex[id] && D.clubIndex[id].name) || id; }
+
+  // ---------- zakładki ----------
+  document.querySelectorAll("nav.tabs button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("nav.tabs button").forEach(function (x) { x.setAttribute("aria-selected", x === b); });
+      document.querySelectorAll(".panel").forEach(function (p) { p.classList.toggle("active", p.id === "panel-" + b.dataset.tab); });
+      if (b.dataset.tab === "stats") renderStats();
+    });
+  });
+
+  // ---------- ładowanie ----------
+  function getJSON(name) {
+    return fetch("data/" + name).then(function (r) {
+      if (!r.ok) throw new Error(name + ": " + r.status);
+      return r.json();
+    });
+  }
+
+  Promise.all(["meta.json", "mps.json", "clubs.json", "bills.json", "stances.json", "club_bill.json"].map(getJSON))
+    .then(function (r) {
+      D.meta = r[0]; D.mps = r[1]; D.clubs = r[2]; D.bills = r[3]; D.stances = r[4]; D.clubBill = r[5];
+      D.mpIndex = {}; D.mps.forEach(function (m) { D.mpIndex[m.id] = m; });
+      D.clubIndex = {}; D.clubs.forEach(function (c) { D.clubIndex[c.id] = c; });
+      D.billIndex = {}; D.bills.forEach(function (b) { b._q = norm(b.title + " " + (b.print || "")); D.billIndex[b.id] = b; });
+      // usuwamy odpowiedzi do ustaw, których już nie ma w danych
+      Object.keys(answers).forEach(function (k) { if (!D.billIndex[k]) delete answers[k]; });
+      init();
+    })
+    .catch(function (e) {
+      $("meta").textContent = "Nie udało się wczytać danych (" + e.message + "). Uruchom najpierw pipeline: python build.py";
+    });
+
+  function init() {
+    var m = D.meta;
+    $("meta").textContent = "Sejm X kadencji · " + m.bills + " projektów, " + m.votings + " głosowań, ostatnie: " +
+      fmtDate(m.lastVote) + " (posiedzenie " + m.lastSitting + ") · dane z " + fmtDate(m.generatedAt);
+
+    var authors = {};
+    D.bills.forEach(function (b) { if (b.author) authors[b.author] = 1; });
+    Object.keys(authors).sort().forEach(function (a) { $("f-author").insertAdjacentHTML("beforeend", "<option>" + esc(a) + "</option>"); });
+
+    var districts = {};
+    D.mps.forEach(function (m) { if (m.district) districts[m.district] = m.districtName; });
+    Object.keys(districts).sort(function (a, b) { return a - b; }).forEach(function (k) {
+      $("o-district").insertAdjacentHTML("beforeend", '<option value="' + k + '">' + k + ". " + esc(districts[k]) + "</option>");
+    });
+    D.clubs.forEach(function (c) {
+      $("o-club").insertAdjacentHTML("beforeend", '<option value="' + esc(c.id) + '">' + esc(c.id) + "</option>");
+    });
+
+    ["q", "f-outcome", "f-author", "f-sort", "f-answered"].forEach(function (id) {
+      $(id).addEventListener(id === "q" ? "input" : "change", function () { shown = PAGE; renderBills(); });
+    });
+    ["o-absent", "o-district", "o-club", "o-active"].forEach(function (id) {
+      $(id).addEventListener("change", function () { mpShown = 25; renderResults(); });
+    });
+    $("more").addEventListener("click", function () { shown += PAGE; renderBills(); });
+    $("mp-more").addEventListener("click", function () { mpShown += 25; renderResults(); });
+    $("reset").addEventListener("click", function () {
+      if (!Object.keys(answers).length || confirm("Wyczyścić wszystkie odpowiedzi?")) { answers = {}; saveAnswers(); renderBills(); renderResults(); }
+    });
+    $("bills").addEventListener("click", function (e) {
+      var btn = e.target.closest("button[data-v]");
+      if (!btn) return;
+      var id = btn.dataset.id, v = Number(btn.dataset.v);
+      if (v === 0 || answers[id] === v) delete answers[id]; else answers[id] = v;
+      saveAnswers();
+      renderBills(); renderResults();
+    });
+
+    renderBills(); renderResults();
+  }
+
+  // ---------- lista ustaw ----------
+  function filteredBills() {
+    var q = norm($("q").value).trim().split(/\s+/).filter(Boolean);
+    var outcome = $("f-outcome").value, author = $("f-author").value, onlyAns = $("f-answered").checked;
+    var list = D.bills.filter(function (b) {
+      if (onlyAns && !answers[b.id]) return false;
+      if (outcome === "weto" ? b.cat !== "weto" : outcome && b.outcome !== outcome) return false;
+      if (author && b.author !== author) return false;
+      for (var i = 0; i < q.length; i++) if (b._q.indexOf(q[i]) < 0) return false;
+      return true;
+    });
+    if ($("f-sort").value === "margin") {
+      list = list.slice().sort(function (a, b) { return (a.margin == null ? 1e9 : a.margin) - (b.margin == null ? 1e9 : b.margin); });
+    }
+    return list;
+  }
+
+  function billHTML(b) {
+    var a = answers[b.id];
+    var link = b.print ? '<a href="https://www.sejm.gov.pl/Sejm10.nsf/druk.xsp?nr=' + encodeURIComponent(b.print) + '" target="_blank" rel="noopener">druk nr ' + esc(b.print) + "</a>" : "";
+    return '<div class="bill">' +
+      '<div class="t">' + esc(b.title) + "</div>" +
+      '<div class="sub"><span>' + fmtDate(b.date) + "</span>" +
+        (b.outcome ? '<span class="tag">' + esc(b.outcome) + "</span>" : "") +
+        "<span>za " + b.yes + " · przeciw " + b.no + " · wstrz. " + b.abst + "</span>" +
+        (b.author ? "<span>projekt " + esc(b.author) + "</span>" : "") +
+        (link ? "<span>" + link + "</span>" : "") +
+      "</div>" +
+      '<div class="acts">' +
+        '<button class="pill yes' + (a === 1 ? " on" : "") + '" data-id="' + esc(b.id) + '" data-v="1" aria-pressed="' + (a === 1) + '">Chcę, żeby przeszło</button>' +
+        '<button class="pill no' + (a === -1 ? " on" : "") + '" data-id="' + esc(b.id) + '" data-v="-1" aria-pressed="' + (a === -1) + '">Nie chcę</button>' +
+        (a ? '<button class="pill" data-id="' + esc(b.id) + '" data-v="0">Bez zdania</button>' : "") +
+      "</div></div>";
+  }
+
+  function renderBills() {
+    var list = filteredBills();
+    $("bill-count").textContent = list.length + " z " + D.bills.length + " projektów";
+    $("bills").innerHTML = list.length ? list.slice(0, shown).map(billHTML).join("") : '<div class="empty">Brak projektów dla tych filtrów.</div>';
+    $("more").hidden = list.length <= shown;
+  }
+
+  // ---------- wyniki ----------
+  function renderResults() {
+    var n = Object.keys(answers).length;
+    var opts = { absentAsDisagree: $("o-absent").checked };
+    $("answered-info").textContent = n ? "Na podstawie " + n + (n === 1 ? " ustawy" : " ustaw") + ", które zaznaczyłeś." : "Zaznacz co najmniej jedną ustawę.";
+    if (!n) { $("club-results").innerHTML = "—"; $("mp-results").innerHTML = "—"; $("mp-more").hidden = true; return; }
+
+    // kluby
+    var clubs = Score.rank(Score.scoreClubs(answers, D.clubBill, opts)).filter(function (c) { return c.members >= 3; });
+    $("club-results").className = "";
+    $("club-results").innerHTML = clubs.map(function (c) {
+      return '<div class="result"><div class="name" title="' + esc(clubName(c.club)) + '">' + esc(c.club) + '</div><div class="pct">' + pct(c.score) + "</div>" +
+        '<div class="bar"><span style="width:' + Math.round(c.score * 100) + '%"></span></div>' +
+        '<div class="sub">' + esc(clubName(c.club)) + " · " + c.bills + " z " + n + " ustaw</div></div>";
+    }).join("") || '<div class="empty">Brak danych.</div>';
+
+    // posłowie
+    var district = $("o-district").value, club = $("o-club").value, active = $("o-active").checked;
+    var minCounted = Math.max(1, Math.ceil(n / 2));
+    var mps = Score.rank(Score.scoreMps(answers, D.stances, opts), minCounted).filter(function (r) {
+      var m = D.mpIndex[r.id];
+      if (!m) return false;
+      if (active && !m.active) return false;
+      if (district && String(m.district) !== district) return false;
+      if (club && m.club !== club) return false;
+      return true;
+    });
+    $("mp-results").className = "";
+    $("mp-results").innerHTML = mps.slice(0, mpShown).map(function (r) {
+      var m = D.mpIndex[r.id];
+      return '<div class="result"><div class="name">' + esc(m.name) + '</div><div class="pct">' + pct(r.score) + "</div>" +
+        '<div class="bar"><span style="width:' + Math.round(r.score * 100) + '%"></span></div>' +
+        '<div class="sub">' + esc(m.club || "") + " · okręg " + esc(m.district) + " " + esc(m.districtName || "") +
+          " · głosował w " + r.voted + " z " + r.eligible + (r.absent ? ", nieobecny " + r.absent : "") + "</div>" +
+        "<details><summary>porównaj ustawa po ustawie</summary>" + compareHTML(r) + "</details></div>";
+    }).join("") || '<div class="empty">Brak posłów spełniających kryteria (poseł musi głosować w co najmniej połowie zaznaczonych ustaw).</div>';
+    $("mp-more").hidden = mps.length <= mpShown;
+  }
+
+  function compareHTML(r) {
+    var labels = { "+": "poparł", "-": "przeciw", "0": "wstrzymał się", ".": "nieobecny" };
+    return '<ul class="cmp">' + Object.keys(r.perBill).map(function (id) {
+      var ch = r.perBill[id], u = answers[id], v = Score.stanceValue(ch);
+      var cls = v === null ? "mid" : v === 0 ? "mid" : v === u ? "ok" : "bad";
+      return '<li><b class="' + cls + '">' + labels[ch] + "</b><span>" + esc(D.billIndex[id].title) + " <span class='mid'>(Ty: " + (u === 1 ? "chcę" : "nie chcę") + ")</span></span></li>";
+    }).join("") + "</ul>";
+  }
+
+  // ---------- statystyki ----------
+  var statsDone = false;
+  function renderStats() {
+    if (statsDone || !D.mps) return;
+    statsDone = true;
+    getJSON("stats.json").then(function (S) {
+      var colorOf = {};
+      D.clubs.forEach(function (c, i) { colorOf[c.id] = PALETTE[i % PALETTE.length]; });
+      var activeMp = function (id) { var m = D.mpIndex[id]; return m && m.active; };
+
+      // PCA
+      var W = 720, H = 440, pad = 16;
+      var pts = S.pca.filter(function (p) { return D.mpIndex[p.id]; });
+      $("pca").innerHTML = pts.length ? '<svg viewBox="0 0 ' + W + " " + H + '" width="100%" role="img" aria-label="Mapa podobieństwa posłów">' +
+        '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="var(--surface-2)" rx="8"/>' +
+        pts.map(function (p) {
+          var m = D.mpIndex[p.id];
+          var x = pad + (p.x + 1) / 2 * (W - 2 * pad), y = pad + (1 - (p.y + 1) / 2) * (H - 2 * pad);
+          return '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="4.2" fill="' + (colorOf[m.club] || "#999") +
+            '" fill-opacity="' + (m.active ? 0.85 : 0.3) + '" data-tip="' + esc(m.name + " · " + (m.club || "")) + '"/>';
+        }).join("") + "</svg>" : '<div class="empty">Za mało danych.</div>';
+      $("pca-legend").innerHTML = D.clubs.map(function (c) { return "<span><i style='background:" + colorOf[c.id] + "'></i>" + esc(c.id) + "</span>"; }).join("") +
+        "<span class='mid'>blade kropki = byli posłowie</span>";
+
+      // lojalność
+      var loy = S.loyalty.filter(function (r) { return activeMp(r.id) && r.n >= 200; }).sort(function (a, b) { return b.rate - a.rate; }).slice(0, 15);
+      $("loyalty").innerHTML = table(["Poseł", "Klub", "Wbrew klubowi", "w ustawach"], loy.map(function (r) {
+        var m = D.mpIndex[r.id];
+        return [esc(m.name), esc(m.club), pct(r.rate) + " <span class='mid'>(" + r.against + ")</span>", r.keyAgainst + " / " + r.keyN];
+      }), [2, 3]);
+
+      // frekwencja
+      var att = S.attendance.filter(function (r) { return activeMp(r.id) && r.n >= 200; }).sort(function (a, b) { return a.rate - b.rate; }).slice(0, 15);
+      $("attendance").innerHTML = table(["Poseł", "Klub", "Frekwencja", "w ustawach"], att.map(function (r) {
+        var m = D.mpIndex[r.id];
+        return [esc(m.name), esc(m.club), pct(r.rate), r.keyN ? pct(r.keyPresent / r.keyN) : "—"];
+      }), [2, 3]);
+
+      // zgodność klubów
+      var clubIds = D.clubs.map(function (c) { return c.id; });
+      var al = {}; S.alignment.forEach(function (r) { al[r.a + "|" + r.b] = r; });
+      $("alignment").innerHTML = '<table class="heat"><tr><th></th>' + clubIds.map(function (c) { return "<th>" + esc(c) + "</th>"; }).join("") + "</tr>" +
+        clubIds.map(function (a) {
+          return "<tr><th>" + esc(a) + "</th>" + clubIds.map(function (b) {
+            var r = al[a + "|" + b];
+            if (!r || r.n < 10) return "<td class='mid'>—</td>";
+            return "<td style='background:color-mix(in srgb, var(--accent) " + Math.round(r.agree * 60) + "%, transparent)' title='" + r.n + " ustaw'>" + pct(r.agree) + "</td>";
+          }).join("") + "</tr>";
+        }).join("") + "</table>";
+
+      // wnioskodawcy
+      $("authors").innerHTML = table(["Projekt", "Liczba", "Przyjęte", "Odrzucone"], S.authors.map(function (r) {
+        return [esc(r.author_type), r.n_bills, r.n_passed + " <span class='mid'>(" + pct(r.n_passed / r.n_bills) + ")</span>", r.n_rejected];
+      }), [1, 2, 3]);
+
+      // godziny
+      var max = Math.max.apply(null, S.hours.map(function (h) { return h.n_votings; }).concat([1]));
+      var bw = 26, gh = 150;
+      $("hours").innerHTML = '<svg viewBox="0 0 ' + (24 * bw) + " " + (gh + 18) + '" width="100%" role="img" aria-label="Głosowania według godziny">' +
+        S.hours.map(function (h) {
+          var hh = h.n_votings / max * gh;
+          return '<rect x="' + (h.hour * bw + 3) + '" y="' + (gh - hh) + '" width="' + (bw - 6) + '" height="' + hh + '" rx="2" fill="var(--accent)" data-tip="' + h.hour + ":00 – " + h.n_votings + ' głosowań"/>';
+        }).join("") +
+        [0, 6, 12, 18, 23].map(function (h) { return '<text x="' + (h * bw + bw / 2) + '" y="' + (gh + 14) + '" text-anchor="middle">' + h + "</text>"; }).join("") + "</svg>";
+    }).catch(function (e) { $("pca").innerHTML = '<div class="empty">Nie udało się wczytać statystyk: ' + esc(e.message) + "</div>"; });
+  }
+
+  function table(head, body, numCols) {
+    numCols = numCols || [];
+    var cls = function (i) { return numCols.indexOf(i) >= 0 ? ' class="num"' : ""; };
+    return "<table><tr>" + head.map(function (h, i) { return "<th" + cls(i) + ">" + h + "</th>"; }).join("") + "</tr>" +
+      body.map(function (r) { return "<tr>" + r.map(function (c, i) { return "<td" + cls(i) + ">" + c + "</td>"; }).join("") + "</tr>"; }).join("") + "</table>";
+  }
+
+  // ---------- podpowiedzi na wykresach ----------
+  var tip = $("tip");
+  document.addEventListener("mousemove", function (e) {
+    var t = e.target.closest && e.target.closest("[data-tip]");
+    if (!t) { tip.style.opacity = 0; return; }
+    tip.textContent = t.getAttribute("data-tip");
+    tip.style.left = Math.min(window.innerWidth - 200, e.clientX + 12) + "px";
+    tip.style.top = (e.clientY + 12) + "px";
+    tip.style.opacity = 1;
+  });
+})();
+</script>
+</body>
+</html>

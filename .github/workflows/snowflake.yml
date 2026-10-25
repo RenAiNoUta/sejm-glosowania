@@ -1,0 +1,55 @@
+name: Snowflake
+
+# Uruchamiany ręcznie (zakładka Actions → Snowflake → Run workflow),
+# żeby nie zużywać kredytów, dopóki nie zechcesz. Gdy będziesz gotowy na
+# codzienne ładowanie, odkomentuj harmonogram.
+on:
+  workflow_dispatch:
+    inputs:
+      command:
+        description: "Co zrobić"
+        type: choice
+        options: [all, migrate, load]
+        default: all
+  # schedule:
+  #   - cron: "47 4 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  snowflake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PRIVATE_KEY_PATH: ${{ runner.temp }}/rsa_key.p8
+      SNOWFLAKE_PRIVATE_KEY_PASSPHRASE: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt "snowflake-connector-python>=3.12"
+
+      - name: Klucz prywatny z sekretu
+        run: |
+          umask 077
+          printf '%s\n' "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > "$SNOWFLAKE_PRIVATE_KEY_PATH"
+
+      # Te same surowe dane, które zbiera workflow "Dane i strona".
+      - name: Przywróć surowe dane
+        uses: actions/cache/restore@v4
+        with:
+          path: data/raw
+          key: raw-${{ github.run_id }}
+          restore-keys: raw-
+
+      - name: Uzupełnij dane z API
+        run: python -m ingest.extract
+
+      - name: Snowflake
+        run: python sf/sf.py ${{ inputs.command || 'all' }}

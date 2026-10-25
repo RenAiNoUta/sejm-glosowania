@@ -1,0 +1,79 @@
+name: Dane i strona
+
+on:
+  schedule:
+    - cron: "17 4 * * *"      # codziennie ok. 5:17/6:17 czasu polskiego
+  workflow_dispatch:
+    inputs:
+      full:
+        description: "Pobierz wszystkie dane od nowa"
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths: ["docs/**", "sql/**", "ingest/**", "build.py", "tests/**", ".github/workflows/pipeline.yml"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Testy
+        run: |
+          python -m unittest discover -s tests
+          node tests/test_score.js
+
+      # Surowe dane trzymamy w cache Actions, nie w repo (dziesiątki MB).
+      # Codzienny przebieg utrzymuje cache przy życiu; po jego utracie
+      # ingest po prostu pobierze wszystko od nowa.
+      - name: Przywróć surowe dane
+        uses: actions/cache/restore@v4
+        with:
+          path: data/raw
+          key: raw-${{ github.run_id }}
+          restore-keys: raw-
+
+      - name: Pobierz dane z API Sejmu
+        run: python -m ingest.extract ${{ inputs.full && '--full' || '' }}
+
+      - name: Zapisz surowe dane
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/raw
+          key: raw-${{ github.run_id }}
+
+      - name: Zbuduj model DuckDB i eksport
+        run: python build.py --report
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

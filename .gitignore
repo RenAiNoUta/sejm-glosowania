@@ -1,0 +1,7 @@
+data/
+docs/data/
+__pycache__/
+*.pyc
+.venv/
+.env
+snowflake/*.p8
