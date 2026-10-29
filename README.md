@@ -1,5 +1,7 @@
 # Jak głosował Sejm
 
+### 👉 [Otwórz aplikację: renainouta.github.io/sejm-glosowania](https://renainouta.github.io/sejm-glosowania/)
+
 Porównaj swoje stanowisko w sprawie ustaw z tym, jak faktycznie głosowali posłowie i kluby Sejmu X kadencji. Dane pochodzą z oficjalnego [API Sejmu](https://api.sejm.gov.pl/) i są odświeżane codziennie przez GitHub Actions.
 
 Projekt edukacyjny: ten sam model danych zbudowany lokalnie w **DuckDB** i (opcjonalnie) w **Snowflake**.
