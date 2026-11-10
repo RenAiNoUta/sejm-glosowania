@@ -25,12 +25,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import sys
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from ingest.sejm_api import SejmApi
+import requests
+
+from ingest.sejm_api import SejmApi, SejmApiUnavailable
 
 RAW_DIR = Path("data/raw")
 VOTE_KEYS_TO_KEEP = ("MP", "club", "vote", "listVotes")
@@ -42,6 +46,9 @@ SUBSTANTIVE_TOPIC = re.compile(r"nad całością|odrzucenie|ponown|wotum", re.IG
 PRINT_NO = re.compile(r"druk\S*\s+nr\s+(\d+)", re.IGNORECASE)
 PROCESS_KEYS = ("number", "title", "titleFinal", "description", "documentType",
                 "passed", "processStartDate", "closureDate", "UE", "urgencyStatus")
+# Jak długo tolerujemy niedziałające API, zanim przebieg zakończy się błędem.
+MAX_OUTAGE_DAYS = 3
+LAST_OK_FILE = "last_success.txt"  # data ostatniego udanego pobrania (w data/raw, w cache)
 PROCESS_REFRESH_DAYS = 7  # trwające procesy i brakujące numery sprawdzamy co tydzień
 
 
@@ -200,7 +207,54 @@ def main() -> None:
     parser.add_argument("--full", action="store_true", help="pobierz wszystko od nowa")
     parser.add_argument("--workers", type=int, default=4, help="ile zapytań równolegle (domyślnie 4)")
     args = parser.parse_args()
-    run(args.term, args.full, workers=args.workers)
+    try:
+        run(args.term, args.full, workers=args.workers)
+    except (SejmApiUnavailable, requests.RequestException) as exc:
+        sys.exit(handle_outage(exc))
+    (RAW_DIR / LAST_OK_FILE).write_text(date.today().isoformat(), encoding="utf-8")
+
+
+def last_success(raw_dir: Path = RAW_DIR) -> date | None:
+    """Data ostatniego udanego pobrania; dla starszego cache – data pliku posłów."""
+    marker = raw_dir / LAST_OK_FILE
+    if marker.exists():
+        try:
+            return date.fromisoformat(marker.read_text(encoding="utf-8").strip())
+        except ValueError:
+            pass
+    mps = raw_dir / "mps.json"
+    if mps.exists():
+        return datetime.fromtimestamp(mps.stat().st_mtime).date()
+    return None
+
+
+def handle_outage(exc: Exception, today: date | None = None, raw_dir: Path = RAW_DIR) -> int:
+    """Awaria API Sejmu. Zwraca kod wyjścia.
+
+    0 – są dane z niedawnego udanego pobrania: ostrzeżenie, strona zostaje
+        z poprzednimi danymi (workflow pomija budowę i publikację),
+    1 – brak danych albo API nie działa od MAX_OUTAGE_DAYS dni lub dłużej.
+    """
+    today = today or date.today()
+    last = last_success(raw_dir)
+    days = (today - last).days if last else None
+    print(f"API Sejmu niedostępne: {exc}")
+
+    if days is None or days >= MAX_OUTAGE_DAYS:
+        since = f"od {days} dni" if days is not None else "i brak wcześniejszych danych"
+        print(f"::error::API Sejmu nie odpowiada {since}. Sprawdź https://api.sejm.gov.pl/")
+        return 1
+
+    print(f"::warning::API Sejmu chwilowo niedostępne – strona zostaje z danymi z {last.isoformat()}. "
+          f"Kolejny przebieg spróbuje ponownie.")
+    if os.environ.get("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+            f.write("api_down=true\n")
+    if os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+            f.write(f"### ⚠️ API Sejmu niedostępne\n\nStrona została z danymi z **{last.isoformat()}**. "
+                    f"Przebieg zakończy się błędem, jeśli awaria potrwa {MAX_OUTAGE_DAYS} dni.\n")
+    return 0
 
 
 if __name__ == "__main__":

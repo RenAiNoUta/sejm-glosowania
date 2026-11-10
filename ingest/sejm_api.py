@@ -14,6 +14,11 @@ import time
 import requests
 
 BASE_URL = "https://api.sejm.gov.pl/sejm"
+
+
+class SejmApiUnavailable(RuntimeError):
+    """API Sejmu nie odpowiada (timeouty, 5xx) mimo ponawiania."""
+
 USER_AGENT = "sejm-glosowania (projekt edukacyjny; github.com/RenAiNoUta/sejm-glosowania)"
 
 
@@ -56,7 +61,7 @@ class SejmApi:
             resp.raise_for_status()
             time.sleep(self.delay)
             return resp.json()
-        raise RuntimeError(f"Nie udało się pobrać {url} po {self.max_retries} próbach")
+        raise SejmApiUnavailable(f"Nie udało się pobrać {url} po {self.max_retries} próbach")
 
     # --- słowniki ---------------------------------------------------------
     def mps(self):

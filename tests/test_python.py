@@ -111,6 +111,36 @@ class ProcessesTest(unittest.TestCase):
                 os.chdir(cwd)
 
 
+class OutageTest(unittest.TestCase):
+    def test_outage_tolerated_then_fails(self):
+        from datetime import date, timedelta
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = Path(tmp)
+            out = raw / "gh_output.txt"
+            os.environ["GITHUB_OUTPUT"] = str(out)
+            try:
+                today = date(2026, 11, 11)
+                # brak jakichkolwiek danych -> błąd
+                self.assertEqual(extract.handle_outage(Exception("503"), today, raw), 1)
+                # udane pobranie wczoraj -> ostrzeżenie, kod 0, flaga dla workflow
+                (raw / extract.LAST_OK_FILE).write_text((today - timedelta(days=1)).isoformat())
+                self.assertEqual(extract.handle_outage(Exception("503"), today, raw), 0)
+                self.assertIn("api_down=true", out.read_text())
+                # awaria trwa już MAX_OUTAGE_DAYS -> błąd
+                old = today - timedelta(days=extract.MAX_OUTAGE_DAYS)
+                (raw / extract.LAST_OK_FILE).write_text(old.isoformat())
+                self.assertEqual(extract.handle_outage(Exception("503"), today, raw), 1)
+            finally:
+                del os.environ["GITHUB_OUTPUT"]
+
+    def test_last_success_falls_back_to_mps_mtime(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            raw = Path(tmp)
+            (raw / "mps.json").write_text("[]")
+            from datetime import date
+            self.assertEqual(extract.last_success(raw), date.today())
+
+
 class BuildFunctionsTest(unittest.TestCase):
     def test_encode(self):
         enc = build.encode_stances([10, 20, 30], [("b1", 10, 1), ("b1", 20, None), ("b2", 30, -1), ("b2", 99, 1)])

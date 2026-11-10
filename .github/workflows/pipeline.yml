@@ -29,6 +29,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    outputs:
+      # false, gdy API Sejmu było chwilowo niedostępne – strona zostaje bez zmian
+      publish: ${{ steps.ingest.outputs.api_down != 'true' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -55,6 +58,7 @@ jobs:
           restore-keys: raw-
 
       - name: Pobierz dane z API Sejmu
+        id: ingest
         run: python -m ingest.extract ${{ inputs.full && '--full' || '' }}
 
       - name: Zapisz surowe dane
@@ -65,14 +69,17 @@ jobs:
           key: raw-${{ github.run_id }}
 
       - name: Zbuduj model DuckDB i eksport
+        if: steps.ingest.outputs.api_down != 'true'
         run: python build.py --report
 
       - uses: actions/upload-pages-artifact@v3
+        if: steps.ingest.outputs.api_down != 'true'
         with:
           path: docs
 
   deploy:
     needs: build
+    if: needs.build.outputs.publish == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
